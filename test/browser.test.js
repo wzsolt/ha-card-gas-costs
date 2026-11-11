@@ -94,12 +94,12 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     const card = page.locator(tag);
     const panel = card.locator(".cost-panel");
     await panel.getByText("Ellenőrizd a tarifát és a kezdőértéket").waitFor();
-    assert.equal(await page.evaluate(() => calls.length), 0);
+    assert.equal(await page.evaluate(() => window.calls.length), 0);
 
     const saved = await page.evaluate(async ({ tag, curve, settings }) => {
       const card = document.querySelector(tag);
       const editor = await card.constructor.getConfigElement();
-      editor.hass = hass;
+      editor.hass = window.hass;
       editor.setConfig(settings);
       document.body.append(editor);
       let next;
@@ -124,7 +124,7 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     for (const [index, expected] of [[0, "11 Ft"], [1, "111 Ft"], [2, "295 Ft"], [3, "105 Ft"]]) {
       assert.equal(await totals.nth(index).locator("dd").first().textContent(), expected);
     }
-    assert.equal(await page.evaluate(() => calls.filter((message) =>
+    assert.equal(await page.evaluate(() => window.calls.filter((message) =>
       message.type === "history/history_during_period").length), 1);
 
     const plot = panel.locator(".plot");
@@ -146,10 +146,10 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     const detailCanvas = panel.locator("canvas");
     await detailCanvas.hover({ position: { x: 48, y: 50 } });
     assert.match(await detail.textContent(), /2023|2024|2025/);
-    const closedBefore = await page.evaluate(() => calls.filter(({ period }) => period === "day").length);
+    const closedBefore = await page.evaluate(() => window.calls.filter(({ period }) => period === "day").length);
     await page.clock.fastForward(5 * 60_000);
-    await page.waitForFunction(() => calls.filter(({ type }) => type === "history/history_during_period").length === 2);
-    assert.equal(await page.evaluate(() => calls.filter(({ period }) => period === "day").length), closedBefore);
+    await page.waitForFunction(() => window.calls.filter(({ type }) => type === "history/history_during_period").length === 2);
+    assert.equal(await page.evaluate(() => window.calls.filter(({ period }) => period === "day").length), closedBefore);
 
     const opening = await page.evaluate((tag) => {
       const editor = document.querySelector(tag + "-editor");
@@ -168,7 +168,7 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     assert.equal(await totals.nth(2).locator("dd").first().textContent(), "95 Ft");
     assert.match(await totals.nth(2).textContent(), /hiányzó napok/);
     assert.doesNotMatch(await panel.textContent(), /Korábbi keret ismeretlen/);
-    assert.equal(await page.evaluate(() => calls.findLast(({ period }) => period === "day").start_time),
+    assert.equal(await page.evaluate(() => window.calls.findLast(({ period }) => period === "day").start_time),
       "2026-10-31T23:00:00.000Z");
     assert.deepEqual(errors, []);
   } finally {

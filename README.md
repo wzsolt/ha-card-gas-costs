@@ -2,6 +2,7 @@
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5)](https://github.com/wzsolt/ha-card-gas-costs#install)
 [![GitHub Actions](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/card.yml/badge.svg?branch=main)](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/card.yml)
+[![Lint](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/lint.yml/badge.svg?branch=main&event=push)](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/lint.yml)
 [![HACS Validation](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/hacs.yml/badge.svg?branch=main)](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/hacs.yml)
 [![Release](https://img.shields.io/github/v/release/wzsolt/ha-card-gas-costs?label=release&color=blue)](https://github.com/wzsolt/ha-card-gas-costs/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
@@ -70,6 +71,7 @@ Install this card from its own HACS repository before updating Gas Meter Card. A
 
 ```sh
 npm ci
+npm run lint
 npm test
 npm run build
 npx playwright-core install chromium
