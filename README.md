@@ -4,7 +4,7 @@
 [![GitHub Actions](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/card.yml/badge.svg?branch=main)](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/card.yml)
 [![Lint](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/lint.yml/badge.svg?branch=main&event=push)](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/lint.yml)
 [![HACS Validation](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/hacs.yml/badge.svg?branch=main)](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/hacs.yml)
-[![Release](https://img.shields.io/github/v/release/wzsolt/ha-card-gas-costs?label=release&color=blue)](https://github.com/wzsolt/ha-card-gas-costs/releases/latest)
+[![Release](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwzsolt%2Fha-card-gas-costs%2Frelease-badge%2Frelease.json)](https://github.com/wzsolt/ha-card-gas-costs/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 A Home Assistant dashboard card that estimates Hungarian MVM residential gas costs in forints. It shows today, this calendar month, the current August–July gas year, and optionally the current billing period. The card is available in Hungarian and English.
@@ -80,4 +80,4 @@ npm run test:browser
 
 Use `GAS_COSTS_CHROMIUM` to point the browser tests at an existing Chromium executable. The bundle is built at `dist/ha-card-gas-costs.js`. Pushes and pull requests run the unit tests, build and browser tests.
 
-To release, update the package version and lockfile, add a matching version section to `CHANGELOG.md`, and push the corresponding tag such as `v0.1.0`. GitHub Actions publishes the module as a release asset after the tests pass, and verifies the asset. The HACS Validation workflow then checks the latest stable release and updates the README badge. The module runs within the user's Home Assistant dashboard and reads data through the existing connection.
+To release, update the package version and lockfile, add a matching version section to `CHANGELOG.md`, and push the corresponding tag such as `v0.1.0`. GitHub Actions publishes the module as a release asset after the tests pass, and verifies the asset. The HACS Validation workflow then checks the latest stable release and updates the Release badge with its version and validation result. The module runs within the user's Home Assistant dashboard and reads data through the existing connection.
