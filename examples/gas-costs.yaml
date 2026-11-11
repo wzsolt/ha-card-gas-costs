@@ -1,0 +1,8 @@
+type: custom:ha-card-gas-costs
+consumption_entity: sensor.gas_consumption
+cost:
+  effective_from: "2026-08-01"
+  discounted_ft_per_mj: 2.86512
+  heating_value_mj_per_m3: 34.8
+  correction_factor: 1.0
+  billing_period_start: "2026-11-04"  # Optional. Update after reporting a reading.
