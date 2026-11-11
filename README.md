@@ -1,5 +1,11 @@
 # Gas Costs Card
 
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5)](https://github.com/wzsolt/ha-card-gas-costs#install)
+[![GitHub Actions](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/card.yml/badge.svg?branch=main)](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/card.yml)
+[![HACS Validation](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/hacs.yml/badge.svg?branch=main)](https://github.com/wzsolt/ha-card-gas-costs/actions/workflows/hacs.yml)
+[![Release](https://img.shields.io/github/v/release/wzsolt/ha-card-gas-costs)](https://github.com/wzsolt/ha-card-gas-costs/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+
 A Home Assistant dashboard card that estimates Hungarian MVM residential gas costs in forints. It shows today, this calendar month, the current August–July gas year, and optionally the current billing period. The card is available in Hungarian and English.
 
 ## Install
