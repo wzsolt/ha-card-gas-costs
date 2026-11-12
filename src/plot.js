@@ -35,7 +35,7 @@ export class Plot {
     this.detailsSlot.append(this.details);
     this.node.tabIndex = 0;
     this.node.setAttribute("role", "group");
-    this.node.append(this.readout, this.canvas, this.detailsSlot);
+    this.node.append(this.canvas, this.detailsSlot);
     this.resize = new ResizeObserver(() => this.draw());
 
     const pointAt = (event) => {
@@ -78,7 +78,6 @@ export class Plot {
     const selectedKey = this.points?.[this.index]?.key;
     this.options = options;
     this.points = points;
-    this.idle = { period: text.tooltipHelp, value: "", details: "" };
     this.descriptions = points.map((point) => {
       const known = point.value !== null;
       const details = known ? options.details(point) : [];
@@ -99,7 +98,7 @@ export class Plot {
   reserveReadoutSpace() {
     // Stack hidden copies under the active readouts so the longest localized
     // breakdown determines the layout at the card's current width.
-    const lines = [this.idle, ...this.descriptions].map(({ period, value }) => {
+    const lines = this.descriptions.map(({ period, value }) => {
       const line = element("div", "readout-line readout-sizer");
       line.setAttribute("aria-hidden", "true");
       line.append(element("span", "", period));
@@ -132,7 +131,7 @@ export class Plot {
 
   select(index) {
     this.index = this.points?.[index] ? index : null;
-    const { period = "", value = "", details = "" } = this.descriptions?.[this.index] ?? this.idle ?? {};
+    const { period = "", value = "", details = "" } = this.descriptions?.[this.index] ?? {};
     if (this.readoutPeriod.textContent !== period) this.readoutPeriod.textContent = period;
     if (this.readoutValue.textContent !== value) this.readoutValue.textContent = value;
     this.readoutValue.hidden = this.index === null;

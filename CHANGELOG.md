@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.5]
+
+- Place the selected date and amount in the chart header with a stable layout.
+
 ## [0.1.4]
 
 - Keep chart positions stable when hovering over a value or showing its cost breakdown.

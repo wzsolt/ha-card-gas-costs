@@ -145,6 +145,7 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
       const top = (selector) => node.querySelector(selector).getBoundingClientRect().top + window.scrollY;
       return [top("canvas"), top(".note"), node.getBoundingClientRect().height];
     });
+    assert.equal(await daily.locator(".readout-line[aria-live]").textContent(), "");
     const baseline = await layout();
     const narrowWidth = (await canvas.boundingBox()).width;
     await canvas.hover({ position: { x: narrowWidth - 16, y: 45 } });
@@ -175,7 +176,14 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     await canvas.tap({ position: { x: width - 20, y: 45 } });
     await canvas.hover({ position: { x: 48, y: 45 } });
     assert.equal(await dailyValue.textContent(), "4 Ft");
-    assert.equal(await daily.locator(".readout").evaluate((node) => node.nextElementSibling.tagName), "CANVAS");
+    const readout = daily.locator(".chart-heading .readout");
+    assert.equal(await readout.count(), 1);
+    assert.deepEqual(await readout.evaluate((node) => {
+      const style = getComputedStyle(node);
+      const date = node.querySelector(".readout-period").getBoundingClientRect();
+      const amount = node.querySelector(".readout-value").getBoundingClientRect();
+      return [style.textAlign, style.borderTopWidth, style.backgroundColor, date.bottom <= amount.top];
+    }), ["right", "0px", "rgba(0, 0, 0, 0)", true]);
     await page.keyboard.press("Escape");
     assert.equal(await dailyValue.isHidden(), true);
 

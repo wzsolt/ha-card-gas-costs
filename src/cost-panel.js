@@ -45,8 +45,8 @@ export class CostPanel {
       const title = element("h3");
       const subtitle = element("p", "subtitle");
       copy.append(title, subtitle);
-      head.append(chartGlyph, copy);
       const plot = new Plot();
+      head.append(chartGlyph, copy, plot.readout);
       const empty = element("p", "status");
       section.append(head, plot.node, empty);
       charts.append(section);
@@ -149,6 +149,7 @@ export class CostPanel {
       title.textContent = text["cost_" + period];
       subtitle.textContent = period === "daily" ? text.costDailyCharge : text.costNetBalance;
       plot.node.hidden = !hasPoints;
+      plot.readout.hidden = !hasPoints;
       empty.hidden = hasPoints;
       empty.textContent = text.empty;
       if (!hasPoints) continue;
