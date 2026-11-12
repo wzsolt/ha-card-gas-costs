@@ -92,10 +92,16 @@ export class CostPanel {
     this.summary.replaceChildren(...Object.entries(view.summary).map(([key, point]) => {
       const item = element("div", "cost-total");
       const label = element("dt", "", text[key]);
-      const value = element("dd", "", point?.value == null ? "—" : currency(point.value));
+      const isToday = key === "costToday";
+      const total = point?.value == null ? null :
+        isToday ? point.discounted + point.market + point.base : point.value;
+      const value = element("dd", "", total === null ? "—" : currency(total));
       const details = point ? flags(point) : [];
       if (key === "costBilling") details.unshift(date.format(point.key));
       item.append(label, value);
+      if (isToday && total !== null) {
+        item.append(element("dd", "subtitle", text.costCorrection + ": " + currency(point.correction)));
+      }
       if (details.length) item.append(element("dd", "subtitle", details.join(" · ")));
       return item;
     }));

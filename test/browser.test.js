@@ -58,7 +58,7 @@ async function mount(page, config, dark = true) {
           return { [request.entity_ids[0]]: [
             { s: "154", lu: start / 1000 },
             { s: "154.25", lc: (start + 1000 + 0.5 * hour) / 1000 },
-            { s: "155.9", lc: (start + 1000 + 10.5 * hour) / 1000 },
+            { s: "154.50", lc: (start + 1000 + 10.5 * hour) / 1000 },
           ] };
         }
         const [id] = request.statistic_ids;
@@ -108,7 +108,7 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
       for (const [field, value] of Object.entries({
         effective_from: "2026-08-01", billing_period_start: "2026-11-04",
         discounted_ft_per_mj: 2, market_ft_per_mj: 10, heating_value_mj_per_m3: 1,
-        correction_factor: 1, annual_allowance_mj: 365, base_ft_per_year: 0,
+        correction_factor: 1, annual_allowance_mj: 365, base_ft_per_year: 360,
         monthly_weights: curve,
       })) {
         form.edit(["cost", field], value);
@@ -121,9 +121,10 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     assert.equal("enabled" in saved.cost, false);
     await panel.locator("canvas").waitFor();
     const totals = panel.locator(".cost-total");
-    for (const [index, expected] of [[0, "11 Ft"], [1, "111 Ft"], [2, "295 Ft"], [3, "105 Ft"]]) {
+    for (const [index, expected] of [[0, "6 Ft"], [1, "108 Ft"], [2, "382 Ft"], [3, "99 Ft"]]) {
       assert.equal(await totals.nth(index).locator("dd").first().textContent(), expected);
     }
+    assert.equal(await totals.nth(0).locator("dd.subtitle").textContent(), "Becsült sávkorrekció: -8 Ft");
     assert.equal(await page.evaluate(() => window.calls.filter((message) =>
       message.type === "history/history_during_period").length), 1);
 
@@ -131,17 +132,17 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     const detail = panel.locator(".readout");
     await plot.focus();
     await page.keyboard.press("End");
-    assert.match(await detail.textContent(), /11 Ft.*Kereten túli díj 19 Ft.*Becsült sávkorrekció -8 Ft/);
+    assert.match(await detail.textContent(), /-2 Ft.*Kereten túli díj 5 Ft.*Alapdíj 1 Ft.*Becsült sávkorrekció -8 Ft/);
     await page.keyboard.press("ArrowLeft");
-    assert.match(await detail.textContent(), /-8 Ft.*Alapdíj 0 Ft.*Becsült sávkorrekció -8 Ft/);
+    assert.match(await detail.textContent(), /-7 Ft.*Alapdíj 1 Ft.*Becsült sávkorrekció -8 Ft/);
     await panel.getByRole("button", { name: "12 hónap" }).click();
     await plot.focus();
     await page.keyboard.press("End");
-    assert.match(await detail.textContent(), /november.*111 Ft/);
+    assert.match(await detail.textContent(), /november.*108 Ft/);
     await panel.getByRole("button", { name: "Kedvezményes évek" }).tap();
     await plot.focus();
     await page.keyboard.press("End");
-    assert.match(await detail.textContent(), /2026.*2027.*295 Ft/);
+    assert.match(await detail.textContent(), /2026.*2027.*382 Ft/);
 
     const detailCanvas = panel.locator("canvas");
     await detailCanvas.hover({ position: { x: 48, y: 50 } });
@@ -164,8 +165,8 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     assert.equal(opening.opening_date, "2026-11-01");
     assert.equal(opening.opening_consumption_m3, 90);
     await panel.locator("canvas").waitFor();
-    assert.equal(await totals.nth(1).locator("dd").first().textContent(), "95 Ft");
-    assert.equal(await totals.nth(2).locator("dd").first().textContent(), "95 Ft");
+    assert.equal(await totals.nth(1).locator("dd").first().textContent(), "92 Ft");
+    assert.equal(await totals.nth(2).locator("dd").first().textContent(), "92 Ft");
     assert.match(await totals.nth(2).textContent(), /hiányzó napok/);
     assert.doesNotMatch(await panel.textContent(), /Korábbi keret ismeretlen/);
     assert.equal(await page.evaluate(() => window.calls.findLast(({ period }) => period === "day").start_time),
