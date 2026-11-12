@@ -119,7 +119,7 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     assert.deepEqual(saved.cost.monthly_weights, curve.split(", ").map(Number));
     assert.equal(saved.cost.billing_period_start, "2026-11-04");
     assert.equal("enabled" in saved.cost, false);
-    await panel.locator("canvas").waitFor();
+    await panel.locator('.cost-chart[data-period="daily"] canvas').waitFor();
     const totals = panel.locator(".cost-total");
     for (const [index, expected] of [[0, "6 Ft"], [1, "108 Ft"], [2, "382 Ft"], [3, "99 Ft"]]) {
       assert.equal(await totals.nth(index).locator("dd").first().textContent(), expected);
@@ -128,25 +128,53 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     assert.equal(await page.evaluate(() => window.calls.filter((message) =>
       message.type === "history/history_during_period").length), 1);
 
-    const plot = panel.locator(".plot");
-    const detail = panel.locator(".readout");
-    await plot.focus();
-    await page.keyboard.press("End");
-    assert.match(await detail.textContent(), /-2 Ft.*Kereten túli díj 5 Ft.*Alapdíj 1 Ft.*Becsült sávkorrekció -8 Ft/);
-    await page.keyboard.press("ArrowLeft");
-    assert.match(await detail.textContent(), /-7 Ft.*Alapdíj 1 Ft.*Becsült sávkorrekció -8 Ft/);
-    await panel.getByRole("button", { name: "12 hónap" }).click();
-    await plot.focus();
-    await page.keyboard.press("End");
-    assert.match(await detail.textContent(), /november.*108 Ft/);
-    await panel.getByRole("button", { name: "Kedvezményes évek" }).tap();
-    await plot.focus();
-    await page.keyboard.press("End");
-    assert.match(await detail.textContent(), /2026.*2027.*382 Ft/);
+    const daily = panel.locator('.cost-chart[data-period="daily"]');
+    const monthly = panel.locator('.cost-chart[data-period="monthly"]');
+    const yearly = panel.locator('.cost-chart[data-period="yearly"]');
+    const dailyToggle = panel.getByRole("button", { name: "30 nap" });
+    const monthlyToggle = panel.getByRole("button", { name: "12 hónap" });
+    const yearlyToggle = panel.getByRole("button", { name: "Kedvezményes évek" });
+    assert.equal(await monthly.isVisible(), false);
+    assert.equal(await yearly.isVisible(), false);
 
-    const detailCanvas = panel.locator("canvas");
-    await detailCanvas.hover({ position: { x: 48, y: 50 } });
-    assert.match(await detail.textContent(), /2023|2024|2025/);
+    const plot = daily.locator(".plot");
+    const dailyValue = daily.locator(".readout-value");
+    await plot.focus();
+    await page.keyboard.press("End");
+    assert.equal(await dailyValue.textContent(), "6 Ft");
+    assert.match(await daily.locator(".chart-details").textContent(), /Kereten túli díj 5 Ft.*Alapdíj 1 Ft.*Becsült sávkorrekció -8 Ft/);
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(await dailyValue.textContent(), "1 Ft");
+    assert.match(await daily.locator(".chart-details").textContent(), /Alapdíj 1 Ft.*Becsült sávkorrekció -8 Ft/);
+    const canvas = daily.locator("canvas");
+    const width = (await canvas.boundingBox()).width;
+    await canvas.tap({ position: { x: width - 20, y: 45 } });
+    await canvas.hover({ position: { x: 48, y: 45 } });
+    assert.equal(await dailyValue.textContent(), "6 Ft");
+    assert.equal(await daily.locator(".readout").evaluate((node) => node.nextElementSibling.tagName), "CANVAS");
+    await page.keyboard.press("Escape");
+    assert.equal(await dailyValue.isHidden(), true);
+
+    await monthlyToggle.click();
+    await yearlyToggle.tap();
+    assert.equal(await daily.isVisible(), true);
+    const monthCanvas = monthly.locator("canvas");
+    const monthWidth = (await monthCanvas.boundingBox()).width;
+    await monthCanvas.click({ position: { x: monthWidth - 20, y: 45 } });
+    assert.match(await monthly.locator(".readout-period").textContent(), /november/);
+    assert.equal(await monthly.locator(".readout-value").textContent(), "108 Ft");
+    await yearly.locator(".plot").focus();
+    await page.keyboard.press("End");
+    assert.match(await yearly.locator(".readout-period").textContent(), /2026.*2027/);
+    assert.equal(await yearly.locator(".readout-value").textContent(), "382 Ft");
+    await dailyToggle.click();
+    assert.equal(await daily.isVisible(), false);
+    assert.equal(await monthly.isVisible(), true);
+    assert.equal(await yearly.isVisible(), true);
+    await monthlyToggle.click();
+    await yearlyToggle.click();
+    assert.equal(await panel.locator(".cost-chart:visible").count(), 0);
+    assert.equal(await totals.nth(0).isVisible(), true);
     const closedBefore = await page.evaluate(() => window.calls.filter(({ period }) => period === "day").length);
     await page.clock.fastForward(5 * 60_000);
     await page.waitForFunction(() => window.calls.filter(({ type }) => type === "history/history_during_period").length === 2);
@@ -157,6 +185,7 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
       const form = editor.shadowRoot.querySelector("ha-form");
       let next;
       editor.addEventListener("config-changed", ({ detail }) => { next = detail.config; });
+      form.edit(["charts", "yearly"], true);
       form.edit(["cost", "opening_date"], "2026-11-01");
       form.edit(["cost", "opening_consumption_m3"], 90);
       document.querySelector(tag).setConfig(next);
@@ -164,7 +193,8 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     }, tag);
     assert.equal(opening.opening_date, "2026-11-01");
     assert.equal(opening.opening_consumption_m3, 90);
-    await panel.locator("canvas").waitFor();
+    assert.equal(await yearlyToggle.getAttribute("aria-pressed"), "true");
+    await panel.locator('.cost-chart[data-period="daily"] canvas').waitFor();
     assert.equal(await totals.nth(1).locator("dd").first().textContent(), "92 Ft");
     assert.equal(await totals.nth(2).locator("dd").first().textContent(), "92 Ft");
     assert.match(await totals.nth(2).textContent(), /hiányzó napok/);

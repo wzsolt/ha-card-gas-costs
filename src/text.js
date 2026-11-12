@@ -1,5 +1,6 @@
 const en = {
-  cost: "Estimated gas cost", costPeriod: "Cost chart period",
+  cost: "Estimated gas cost", costPeriod: "Cost charts",
+  costDailyCharge: "Daily gas charge and base fee", costNetBalance: "Balance after corrections",
   cost_daily: "30 days", cost_monthly: "12 months", cost_yearly: "Gas years",
   costToday: "Today", costMonth: "This month", costYear: "This gas year", costBilling: "Current billing period",
   costDiscount: "Discounted", costMarket: "Above allowance", costBase: "Base fee",
@@ -26,11 +27,12 @@ const en = {
   title: "Title", consumption_entity: "Gas consumption sensor",
   loading: "Loading Recorder data…", error: "Could not load Recorder data.",
   empty: "No Recorder data for this period.", configure: "Select a sensor in the card settings.",
-  missing: "No data", partial: "in progress", tooltipHelp: "Use the arrow keys to browse values.",
+  missing: "No data", partial: "in progress", tooltipHelp: "Select a bar or use the arrow keys.",
 };
 
 const hu = {
-  cost: "Becsült gázköltség", costPeriod: "Költséggrafikon időszaka",
+  cost: "Becsült gázköltség", costPeriod: "Költséggrafikonok",
+  costDailyCharge: "Napi gázdíj és alapdíj", costNetBalance: "Egyenleg korrekcióval",
   cost_daily: "30 nap", cost_monthly: "12 hónap", cost_yearly: "Kedvezményes évek",
   costToday: "Ma", costMonth: "Ebben a hónapban", costYear: "Ebben a kedvezményes évben",
   costBilling: "Aktuális diktálási időszak",
@@ -59,7 +61,7 @@ const hu = {
   loading: "Recorder-adatok betöltése…",
   error: "A Recorder-adatok nem tölthetők be.", empty: "Erre az időszakra nincs Recorder-adat.",
   configure: "Válassz szenzort a kártya beállításaiban.", missing: "Nincs adat",
-  partial: "folyamatban", tooltipHelp: "A nyílbillentyűkkel lépkedhetsz az értékek között.",
+  partial: "folyamatban", tooltipHelp: "Válassz egy oszlopot, vagy használd a nyílbillentyűket.",
 };
 
 export function localeFor(hass) {

@@ -37,7 +37,7 @@ class GasCostsCard extends HTMLElement {
 
   setConfig(config) {
     this.config = normalizeConfig(config);
-    this.panel.reset();
+    this.panel.setConfig(this.config);
     this.update();
   }
 
@@ -47,7 +47,7 @@ class GasCostsCard extends HTMLElement {
   }
 
   connectedCallback() {
-    this.panel.plot.connect();
+    this.panel.connect();
     this.update();
     this.refreshTimer = setInterval(() => this.refresh(), refreshInterval);
   }
@@ -55,7 +55,7 @@ class GasCostsCard extends HTMLElement {
   disconnectedCallback() {
     clearInterval(this.refreshTimer);
     this.panel.reset();
-    this.panel.plot.disconnect();
+    this.panel.disconnect();
     this.scope = undefined;
   }
 

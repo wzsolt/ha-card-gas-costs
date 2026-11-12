@@ -1,5 +1,5 @@
 import { costDefaults, costNumberFields } from "./cost.js";
-import { normalizeConfig } from "./config.js";
+import { chartPeriods, chartVisibility, normalizeConfig } from "./config.js";
 import { numeric } from "./data.js";
 import { element } from "./dom.js";
 import { labels } from "./text.js";
@@ -41,7 +41,7 @@ export class GasCostsEditor extends HTMLElement {
     this.form.hass = this._hass;
     if (this.text !== text) {
       this.text = text;
-      this.form.computeLabel = ({ name }) => text[name] || name;
+      this.form.computeLabel = ({ name }) => text[name] || text["cost_" + name] || name;
       this.form.computeHelper = ({ name }) => ({
         monthly_weights: text.monthlyWeightsHelp,
         opening_consumption_m3: text.openingConsumptionHelp,
@@ -49,6 +49,10 @@ export class GasCostsEditor extends HTMLElement {
       this.form.schema = [
         { name: "title", selector: { text: {} } },
         { name: "consumption_entity", selector: { entity: { filter: { domain: "sensor" } } } },
+        {
+          name: "charts", type: "expandable", title: text.costPeriod, icon: "mdi:chart-bar",
+          schema: chartPeriods.map((name) => ({ name, selector: { boolean: {} } })),
+        },
         {
           name: "cost", type: "expandable", title: text.cost, icon: "mdi:cash",
           schema: [
@@ -71,7 +75,7 @@ export class GasCostsEditor extends HTMLElement {
       if (Array.isArray(costData.monthly_weights)) {
         costData.monthly_weights = costData.monthly_weights.join(", ");
       }
-      this.form.data = { title, consumption_entity, cost: costData };
+      this.form.data = { title, consumption_entity, cost: costData, charts: chartVisibility(this.config.charts) };
       this.renderedConfig = this.config;
     }
   }
@@ -92,6 +96,7 @@ export class GasCostsEditor extends HTMLElement {
       if (weights.length === 12 && weights.every((value) => value !== null)) cost.monthly_weights = weights;
     }
     next.cost = cost;
+    next.charts = chartVisibility(data.charts);
     this.config = next;
     this.dispatchEvent(new CustomEvent("config-changed", {
       detail: { config: next }, bubbles: true, composed: true,

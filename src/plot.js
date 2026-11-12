@@ -24,30 +24,45 @@ export class Plot {
     this.canvas.setAttribute("aria-hidden", "true");
     this.readout = element("div", "readout");
     this.readout.setAttribute("aria-live", "polite");
+    this.readout.setAttribute("aria-atomic", "true");
+    this.readoutPeriod = element("span", "readout-period");
+    this.readoutValue = element("strong", "readout-value");
+    this.readout.append(this.readoutPeriod, this.readoutValue);
+    this.details = element("p", "chart-details");
     this.node.tabIndex = 0;
     this.node.setAttribute("role", "group");
-    this.node.append(this.canvas, this.readout);
+    this.node.append(this.readout, this.canvas, this.details);
     this.resize = new ResizeObserver(() => this.draw());
 
-    const inspect = (event) => {
-      if (!this.points?.length) return;
+    const pointAt = (event) => {
+      if (!this.points?.length) return null;
       const rect = this.canvas.getBoundingClientRect();
       const relative = (event.clientX - rect.left - left) / (rect.width - left - right);
-      this.select(Math.max(0, Math.min(this.points.length - 1, Math.floor(relative * this.points.length))));
+      return relative >= 0 && relative < 1 ? Math.floor(relative * this.points.length) : null;
     };
-    this.canvas.addEventListener("pointermove", inspect);
-    this.canvas.addEventListener("pointerdown", inspect);
+    this.canvas.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "mouse" && !this.pinned) this.select(pointAt(event));
+    });
+    this.canvas.addEventListener("click", (event) => {
+      const index = pointAt(event);
+      if (index === null) return;
+      this.pinned = true;
+      this.select(index);
+      this.node.focus({ preventScroll: true });
+    });
     this.canvas.addEventListener("pointerleave", (event) => {
-      if (event.pointerType === "mouse" && !this.node.matches(":focus")) this.select(null);
+      if (event.pointerType === "mouse" && !this.pinned && !this.node.matches(":focus")) this.select(null);
     });
     this.node.addEventListener("focus", () => {
-      if (this.index == null) this.select(this.points.findLastIndex(({ value }) => value !== null));
+      if (this.index == null) this.select(this.points?.findLastIndex(({ value }) => value !== null));
     });
-    this.node.addEventListener("blur", () => this.select(null));
+    this.node.addEventListener("blur", () => {
+      if (!this.pinned) this.select(null);
+    });
     this.node.addEventListener("keydown", (event) => {
-      if (!["ArrowLeft", "ArrowRight", "Home", "End", "Escape"].includes(event.key)) return;
+      if (!this.points?.length || !["ArrowLeft", "ArrowRight", "Home", "End", "Escape"].includes(event.key)) return;
       event.preventDefault();
-      if (event.key === "Escape") return this.select(null);
+      if (event.key === "Escape") return this.clearSelection();
       if (event.key === "Home") return this.select(0);
       if (event.key === "End") return this.select(this.points.length - 1);
       const delta = event.key === "ArrowLeft" ? -1 : 1;
@@ -56,12 +71,14 @@ export class Plot {
   }
 
   setData(points, locale, text, options) {
+    const selectedKey = this.points?.[this.index]?.key;
     this.options = options;
     this.points = points;
     this.text = text;
     this.axisNumber = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });
     this.node.setAttribute("aria-label", options.label + ". " + text.tooltipHelp);
-    this.select(this.index < points.length ? this.index : null);
+    this.select(points.findIndex(({ key }) => key === selectedKey));
+    if (this.index === null) this.pinned = false;
   }
 
   connect() {
@@ -73,17 +90,25 @@ export class Plot {
     this.resize.disconnect();
   }
 
+  clearSelection() {
+    this.pinned = false;
+    this.select(null);
+  }
+
   select(index) {
     this.index = this.points?.[index] ? index : null;
     const point = this.points?.[this.index];
-    let description = this.text?.tooltipHelp ?? "";
-    if (point) {
-      const value = point.value === null ? this.text.missing :
-        this.options.value(point);
-      description = this.options.period(point) + " · " + value;
-      if (point.partial) description += " · " + this.text.partial;
-    }
-    if (this.readout.textContent !== description) this.readout.textContent = description;
+    const known = point && point.value !== null;
+    const period = point ? this.options.period(point) : this.text?.tooltipHelp ?? "";
+    const value = point ? (known ? this.options.value(point) : this.text.missing) : "";
+    const details = known ? this.options.details(point) : [];
+    if (point?.partial) details.push(this.text.partial);
+
+    if (this.readoutPeriod.textContent !== period) this.readoutPeriod.textContent = period;
+    if (this.readoutValue.textContent !== value) this.readoutValue.textContent = value;
+    this.readoutValue.hidden = !point;
+    this.details.textContent = details.join(" · ");
+    this.details.hidden = details.length === 0;
     this.draw();
   }
 
@@ -125,10 +150,15 @@ export class Plot {
       ctx.fillText(this.options.tick(this.points[index]), x(index), height - 10);
     }
 
+    if (this.index !== null) {
+      ctx.fillStyle = colors.line;
+      ctx.globalAlpha = 0.16;
+      ctx.fillRect(x(this.index) - slot / 2, top, slot, chartHeight);
+    }
     ctx.fillStyle = colors.line;
     this.points.forEach(({ value, partial }, index) => {
       if (value === null) return;
-      ctx.globalAlpha = partial ? 0.55 : 1;
+      ctx.globalAlpha = partial && index !== this.index ? 0.55 : 1;
       const bar = Math.min(32, slot * 0.67);
       const zero = y(0);
       const barHeight = Math.max(1, Math.abs(zero - y(value)));
@@ -139,11 +169,5 @@ export class Plot {
       ctx.fill();
     });
     ctx.globalAlpha = 1;
-    if (this.index != null) {
-      ctx.fillStyle = colors.text;
-      ctx.globalAlpha = 0.55;
-      ctx.fillRect(x(this.index), top, 1, chartHeight);
-      ctx.globalAlpha = 1;
-    }
   }
 }

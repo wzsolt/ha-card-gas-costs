@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.2]
+
+- Plot each day’s gas charge and base fee, with tier corrections shown separately in the breakdown.
+- Show the selected period and amount prominently above each chart. Click or tap to keep a selection visible.
+- Toggle the daily, monthly, and gas-year charts independently and configure their initial visibility.
+
 ## [0.1.1]
 
 - Show today’s gas charge and base fee separately from the estimated tier correction. Period balances and charts still include corrections.

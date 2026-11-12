@@ -1,13 +1,17 @@
+import { chartPeriods, chartVisibility } from "./config.js";
 import { buildCostView, costOptions, fetchClosedDays, fetchTodayVolume } from "./cost.js";
 import { element, icon } from "./dom.js";
 import { Plot } from "./plot.js";
 
-const periods = ["daily", "monthly", "yearly"];
 const historyLifetime = 60 * 60_000;
+
+function dailyCharge(point) {
+  return point?.value == null ? null : point.discounted + point.market + point.base;
+}
 
 export class CostPanel {
   constructor() {
-    this.period = "daily";
+    this.visible = chartVisibility();
     this.node = element("section", "cost-panel");
 
     const heading = element("div", "chart-heading");
@@ -19,30 +23,49 @@ export class CostPanel {
     this.summary = element("dl", "cost-summary");
     this.controls = element("div", "cost-controls");
     this.controls.setAttribute("role", "group");
-    this.periodButtons = new Map(periods.map((period) => {
+    this.charts = new Map(chartPeriods.map((period) => {
       const button = element("button", "toggle");
       button.type = "button";
       button.dataset.period = period;
       button.addEventListener("click", () => {
-        this.period = period;
-        this.plot.select(null);
+        this.visible[period] = !this.visible[period];
         this.render(this.context);
       });
       this.controls.append(button);
-      return [period, button];
+
+      const section = element("section", "cost-chart");
+      section.dataset.period = period;
+      section.hidden = true;
+      const title = element("h3", "cost-chart-title");
+      const plot = new Plot();
+      const empty = element("p", "status");
+      section.append(title, plot.node, empty);
+      return [period, { button, section, title, plot, empty }];
     }));
-    this.plot = new Plot();
     this.status = element("p", "status");
     this.status.setAttribute("role", "status");
     this.note = element("p", "note");
-    this.node.append(heading, this.summary, this.controls, this.plot.node, this.status, this.note);
+    this.node.append(heading, this.summary, this.controls, ...[...this.charts.values()].map(({ section }) => section), this.status, this.note);
+  }
+
+  setConfig(config) {
+    this.visible = chartVisibility(config.charts);
+    this.reset();
+  }
+
+  connect() {
+    for (const { plot } of this.charts.values()) plot.connect();
+  }
+
+  disconnect() {
+    for (const { plot } of this.charts.values()) plot.disconnect();
   }
 
   reset() {
     this.result = undefined;
     this.request = undefined;
     this.history = undefined;
-    this.plot.select(null);
+    for (const { plot } of this.charts.values()) plot.clearSelection();
   }
 
   render(context) {
@@ -51,17 +74,16 @@ export class CostPanel {
     this.heading.textContent = config.title || text.cost;
     this.controls.setAttribute("aria-label", text.costPeriod);
     this.note.textContent = text.costEstimate;
-    for (const [period, button] of this.periodButtons) {
-      button.setAttribute("aria-pressed", String(period === this.period));
-      button.textContent = text["cost_" + period];
-    }
     const issue = this.configIssue(hass, config) ?? this.result?.dateIssue;
     const view = issue ? undefined : this.result?.view;
-    const points = view?.[this.period];
-    const hasData = Boolean(points?.some(({ value }) => value !== null));
-    this.plot.node.hidden = !hasData;
+    const hasData = Boolean(view?.yearly.some(({ value }) => value !== null));
     this.controls.hidden = !view;
     this.summary.hidden = !view;
+    for (const [period, { button, section }] of this.charts) {
+      button.setAttribute("aria-pressed", String(this.visible[period]));
+      button.textContent = text["cost_" + period];
+      section.hidden = !view || !this.visible[period];
+    }
     const warning = view?.summary.costYear?.uncertain ? text.costUncertain :
       this.result?.closedFailed ? text.costHistoryError : "";
     this.status.textContent = issue ? text[issue] :
@@ -70,11 +92,9 @@ export class CostPanel {
       !hasData ? text.empty : warning;
     this.status.hidden = !this.status.textContent;
     const appearance = JSON.stringify([locale, themeMode, hass.selectedTheme]);
-    if (!view || (view === this.renderedView && this.renderedPeriod === this.period &&
-        this.appearance === appearance)) return;
+    if (!view || (view === this.renderedView && this.appearance === appearance)) return;
 
     this.renderedView = view;
-    this.renderedPeriod = this.period;
     this.appearance = appearance;
     const amount = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
     const currency = (value) => amount.format(Math.round(value) || 0) + " Ft";
@@ -93,8 +113,7 @@ export class CostPanel {
       const item = element("div", "cost-total");
       const label = element("dt", "", text[key]);
       const isToday = key === "costToday";
-      const total = point?.value == null ? null :
-        isToday ? point.discounted + point.market + point.base : point.value;
+      const total = isToday ? dailyCharge(point) : point.value;
       const value = element("dd", "", total === null ? "—" : currency(total));
       const details = point ? flags(point) : [];
       if (key === "costBilling") details.unshift(date.format(point.key));
@@ -105,25 +124,33 @@ export class CostPanel {
       if (details.length) item.append(element("dd", "subtitle", details.join(" · ")));
       return item;
     }));
-    if (!hasData) return;
-
-    const chartPeriod = this.period;
-    this.plot.setData(points, locale, text, {
-      label: text.cost + " · " + text["cost_" + chartPeriod],
-      tick: (point) => chartPeriod === "yearly"
-        ? new Date(point.key).getUTCFullYear() + "/" + String(new Date(point.end).getUTCFullYear()).slice(-2)
-        : (chartPeriod === "monthly" ? shortMonth : shortDay).format(point.key),
-      period: (point) => chartPeriod === "yearly" ? dateRange(point) :
-        (chartPeriod === "monthly" ? month : date).format(point.key),
-      value: (point) => [
-        currency(point.value),
-        text.costDiscount + " " + currency(point.discounted),
-        text.costMarket + " " + currency(point.market),
-        text.costBase + " " + currency(point.base),
-        Math.round(point.correction) !== 0 && text.costCorrection + " " + currency(point.correction),
-        ...flags(point),
-      ].filter(Boolean).join(" · "),
-    });
+    for (const [period, { title, plot, empty }] of this.charts) {
+      const points = period === "daily"
+        ? view.daily.map((point) => ({ ...point, value: dailyCharge(point) }))
+        : view[period];
+      const hasPoints = points.some(({ value }) => value !== null);
+      title.textContent = text["cost_" + period];
+      plot.node.hidden = !hasPoints;
+      empty.hidden = hasPoints;
+      empty.textContent = text.empty;
+      if (!hasPoints) continue;
+      plot.setData(points, locale, text, {
+        label: title.textContent + " · " + (period === "daily" ? text.costDailyCharge : text.costNetBalance),
+        tick: (point) => period === "yearly"
+          ? new Date(point.key).getUTCFullYear() + "/" + String(new Date(point.end).getUTCFullYear()).slice(-2)
+          : (period === "monthly" ? shortMonth : shortDay).format(point.key),
+        period: (point) => period === "yearly" ? dateRange(point) :
+          (period === "monthly" ? month : date).format(point.key),
+        value: (point) => currency(point.value),
+        details: (point) => [
+          text.costDiscount + " " + currency(point.discounted),
+          text.costMarket + " " + currency(point.market),
+          text.costBase + " " + currency(point.base),
+          Math.round(point.correction) !== 0 && text.costCorrection + " " + currency(point.correction),
+          ...flags(point),
+        ].filter(Boolean),
+      });
+    }
   }
 
   configIssue(hass, config) {

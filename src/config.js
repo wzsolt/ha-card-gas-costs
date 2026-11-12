@@ -1,5 +1,11 @@
 export const CARD_TYPE = "ha-card-gas-costs";
 
+export const chartPeriods = ["daily", "monthly", "yearly"];
+
+export function chartVisibility(charts) {
+  return { daily: charts?.daily !== false, monthly: charts?.monthly === true, yearly: charts?.yearly === true };
+}
+
 export function normalizeConfig(config) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     throw new Error("Gas Costs Card requires a configuration object.");

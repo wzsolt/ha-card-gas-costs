@@ -63,11 +63,29 @@ h2 { font-size: 1.2rem; font-weight: 650; line-height: 1.25; }
 .cost-total dd { margin: 3px 0 0; font-variant-numeric: tabular-nums; }
 .cost-total dd:not(.subtitle) { font-weight: 650; }
 .cost-controls { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.cost-panel .readout { overflow-wrap: anywhere; }
+.cost-chart { margin: 12px 0; }
+.cost-chart-title { margin: 0 0 4px; font-size: 0.8rem; color: var(--gas-muted); }
 .plot { color: var(--accent); border: 0 solid var(--gas-grid); border-radius: 6px; }
 canvas { display: block; width: 100%; height: 148px; touch-action: pan-y; }
-.note, .status, .readout { font-size: 0.75rem; color: var(--gas-muted); line-height: 1.4; }
-.readout { min-height: 1.4em; margin: 0 4px; font-variant-numeric: tabular-nums; }
+.note, .status, .chart-details { font-size: 0.75rem; color: var(--gas-muted); line-height: 1.4; }
+.readout {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-block-size: 3.5rem;
+  padding: 5px 10px;
+  border: 1px solid var(--gas-grid);
+  border-radius: 8px;
+  color: var(--gas-muted);
+  background: var(--gas-surface);
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+.readout-period { overflow-wrap: anywhere; }
+.readout-value { color: var(--gas-text); font-size: 1.15rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chart-details { margin: 4px; overflow-wrap: anywhere; }
 .note { margin: 4px; }
 .status { margin: 8px 4px 6px; }
 @container (max-width: 360px) {
