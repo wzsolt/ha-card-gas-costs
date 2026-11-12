@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.3]
+
+- Allocate each month’s earned discount across its measured days so daily charges reconcile to the monthly balance.
+- Show corrections for earlier months separately from the current month’s charges.
+
 ## [0.1.2]
 
 - Plot each day’s gas charge and base fee, with tier corrections shown separately in the breakdown.

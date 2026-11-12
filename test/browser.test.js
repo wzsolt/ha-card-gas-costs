@@ -121,10 +121,10 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     assert.equal("enabled" in saved.cost, false);
     await panel.locator('.cost-chart[data-period="daily"] canvas').waitFor();
     const totals = panel.locator(".cost-total");
-    for (const [index, expected] of [[0, "6 Ft"], [1, "108 Ft"], [2, "382 Ft"], [3, "99 Ft"]]) {
+    for (const [index, expected] of [[0, "4 Ft"], [1, "108 Ft"], [2, "382 Ft"], [3, "99 Ft"]]) {
       assert.equal(await totals.nth(index).locator("dd").first().textContent(), expected);
     }
-    assert.equal(await totals.nth(0).locator("dd.subtitle").textContent(), "Becsült sávkorrekció: -8 Ft");
+    assert.equal(await totals.nth(0).locator("dd.subtitle").textContent(), "Korábbi hónapok becsült sávkorrekciója: 0 Ft");
     assert.equal(await page.evaluate(() => window.calls.filter((message) =>
       message.type === "history/history_during_period").length), 1);
 
@@ -141,16 +141,16 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     const dailyValue = daily.locator(".readout-value");
     await plot.focus();
     await page.keyboard.press("End");
-    assert.equal(await dailyValue.textContent(), "6 Ft");
-    assert.match(await daily.locator(".chart-details").textContent(), /Kereten túli díj 5 Ft.*Alapdíj 1 Ft.*Becsült sávkorrekció -8 Ft/);
+    assert.equal(await dailyValue.textContent(), "4 Ft");
+    assert.match(await daily.locator(".chart-details").textContent(), /Kedvezményes díj 1 Ft.*Kereten túli díj 2 Ft.*Alapdíj 1 Ft/);
     await page.keyboard.press("ArrowLeft");
     assert.equal(await dailyValue.textContent(), "1 Ft");
-    assert.match(await daily.locator(".chart-details").textContent(), /Alapdíj 1 Ft.*Becsült sávkorrekció -8 Ft/);
+    assert.match(await daily.locator(".chart-details").textContent(), /Kereten túli díj 0 Ft.*Alapdíj 1 Ft/);
     const canvas = daily.locator("canvas");
     const width = (await canvas.boundingBox()).width;
     await canvas.tap({ position: { x: width - 20, y: 45 } });
     await canvas.hover({ position: { x: 48, y: 45 } });
-    assert.equal(await dailyValue.textContent(), "6 Ft");
+    assert.equal(await dailyValue.textContent(), "4 Ft");
     assert.equal(await daily.locator(".readout").evaluate((node) => node.nextElementSibling.tagName), "CANVAS");
     await page.keyboard.press("Escape");
     assert.equal(await dailyValue.isHidden(), true);
@@ -187,16 +187,18 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
       editor.addEventListener("config-changed", ({ detail }) => { next = detail.config; });
       form.edit(["charts", "yearly"], true);
       form.edit(["cost", "opening_date"], "2026-11-01");
-      form.edit(["cost", "opening_consumption_m3"], 90);
+      form.edit(["cost", "opening_consumption_m3"], 95);
       document.querySelector(tag).setConfig(next);
       return next.cost;
     }, tag);
     assert.equal(opening.opening_date, "2026-11-01");
-    assert.equal(opening.opening_consumption_m3, 90);
+    assert.equal(opening.opening_consumption_m3, 95);
     assert.equal(await yearlyToggle.getAttribute("aria-pressed"), "true");
     await panel.locator('.cost-chart[data-period="daily"] canvas').waitFor();
-    assert.equal(await totals.nth(1).locator("dd").first().textContent(), "92 Ft");
-    assert.equal(await totals.nth(2).locator("dd").first().textContent(), "92 Ft");
+    assert.equal(await totals.nth(1).locator("dd").first().textContent(), "108 Ft");
+    assert.equal(await totals.nth(1).getByText("E havi díjak: 132 Ft").count(), 1);
+    assert.equal(await totals.nth(1).getByText("Korábbi hónapok becsült sávkorrekciója: -24 Ft").count(), 1);
+    assert.equal(await totals.nth(2).locator("dd").first().textContent(), "108 Ft");
     assert.match(await totals.nth(2).textContent(), /hiányzó napok/);
     assert.doesNotMatch(await panel.textContent(), /Korábbi keret ismeretlen/);
     assert.equal(await page.evaluate(() => window.calls.findLast(({ period }) => period === "day").start_time),

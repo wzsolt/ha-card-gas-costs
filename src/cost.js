@@ -121,7 +121,8 @@ export function dailyLedger(days, first, today, options) {
 
     // New quota first reprices previous usage above the cap. The remainder
     // and any unused quota from earlier days cover today's usage.
-    const repriced = Math.min(dailyQuota, Math.max(0, used - quota));
+    const uncoveredBefore = Math.max(0, used - quota);
+    const repriced = Math.min(dailyQuota, uncoveredBefore);
     quota += dailyQuota;
     const discountedHeat = Math.min(heat, Math.max(0, quota - used));
     used += heat;
@@ -132,25 +133,69 @@ export function dailyLedger(days, first, today, options) {
     ledger.set(key, {
       value: discounted + market + correction + base,
       discounted, market, correction, base, uncertain,
+      heat, discountedHeat, uncoveredBefore, repriced,
     });
   }
   return ledger;
 }
 
-function summarize(ledger, key, end, today, delayed, first) {
+function allocateDailyCharges(ledger, options) {
+  const charges = new Map();
+  const discount = options.discounted_ft_per_mj;
+  const marketRate = options.market_ft_per_mj;
+  let segment = [];
+  let lastDay;
+  let previousMonthsHeat = 0;
+  let segmentHeat = 0;
+  let segmentDiscountedHeat = 0;
+
+  function closeSegment() {
+    const share = segmentHeat > 0 ? Math.min(1, segmentDiscountedHeat / segmentHeat) : 0;
+    for (const { key, line, earlierCorrection } of segment) {
+      const discounted = line.heat * share * discount;
+      const market = line.heat * (1 - share) * marketRate;
+      charges.set(key, { value: discounted + market + line.base, discounted, market, earlierCorrection });
+    }
+    segment = [];
+    segmentHeat = 0;
+    segmentDiscountedHeat = 0;
+  }
+
+  // Allocate a month's earned discount to its measured consumption. A gap
+  // resets the ledger, so only distribute allowance across consecutive days.
+  for (const [key, line] of ledger) {
+    if (key !== lastDay + dayMs || key === monthStart(key)) {
+      closeSegment();
+      previousMonthsHeat = line.uncoveredBefore;
+    }
+    const earlierRepriced = Math.min(previousMonthsHeat, line.repriced);
+    previousMonthsHeat -= earlierRepriced;
+    const earlierCorrection = earlierRepriced * (discount - marketRate);
+    segment.push({ key, line, earlierCorrection });
+    segmentHeat += line.heat;
+    segmentDiscountedHeat += line.discountedHeat + (line.repriced - earlierRepriced);
+    lastDay = key;
+  }
+  closeSegment();
+  return charges;
+}
+
+function summarize(ledger, charges, key, end, today, delayed, first) {
   const last = Math.min(end, today + dayMs);
   const totals = { value: 0, discounted: 0, market: 0, correction: 0, base: 0 };
   let count = 0;
+  let earlierCorrection = 0;
   let uncertain = false;
   for (let date = Math.max(key, first); date < last; date += dayMs) {
     const line = ledger.get(date);
     if (!line) continue;
     for (const field of Object.keys(totals)) totals[field] += line[field];
     count++;
+    earlierCorrection += charges.get(date).earlierCorrection;
     uncertain ||= line.uncertain;
   }
   return {
-    ...totals, key, end, value: count ? totals.value : null,
+    ...totals, earlierCorrection, key, end, value: count ? totals.value : null,
     partial: end > today,
     incomplete: count !== (last - key) / dayMs,
     uncertain,
@@ -161,10 +206,11 @@ function summarize(ledger, key, end, today, delayed, first) {
 export function buildCostView(days, today, options, delayed = false) {
   const first = costHistoryStart(today, options);
   const ledger = dailyLedger(days, first, today, options);
-  const point = (start, end) => summarize(ledger, start, end, today, delayed, first);
+  const charges = allocateDailyCharges(ledger, options);
+  const point = (start, end) => summarize(ledger, charges, start, end, today, delayed, first);
   const daily = Array.from({ length: 30 }, (_, index) => {
     const key = today - (29 - index) * dayMs;
-    return point(key, key + dayMs);
+    return { ...point(key, key + dayMs), charge: charges.get(key) };
   });
   const monthly = Array.from({ length: 12 }, (_, index) =>
     point(monthStart(today, index - 11), monthStart(today, index - 10)));

@@ -31,6 +31,37 @@ test("carries unused allowance and separately reprices earlier above-allowance u
   close([...ledger.values()].reduce((total, point) => total + point.value, 0), 4 * 2 + 5 * 10);
 });
 
+test("allocates the month's earned discount to the measured days and reconciles the monthly total", () => {
+  const start = key("2026-08-01");
+  const today = start + 2 * day;
+  const days = new Map([[start, 1], [start + day, 1], [today, 0]]);
+  const view = buildCostView(days, today, options());
+  const points = view.daily.slice(-3);
+  assert.deepEqual(points.map(({ charge }) => charge.value), [48, 48, 0]);
+  assert.equal(view.summary.costMonth.earlierCorrection, 0);
+  assert.equal(view.summary.costMonth.value, 96);
+  assert.equal(view.summary.costToday.charge.value, 0);
+});
+
+test("keeps correction of opening consumption separate from current month charges", () => {
+  const start = key("2026-11-01");
+  const today = start + 5 * day;
+  const days = new Map(Array.from({ length: 6 }, (_, index) =>
+    [start + index * day, index < 2 ? 1 : 0]));
+  const view = buildCostView(days, today, options({
+    opening_date: "2026-11-01", opening_consumption_m3: 16,
+  }));
+  const displayed = view.daily.slice(-6);
+  close(displayed[0].charge.value, 47.2);
+  close(displayed[1].charge.value, 47.2);
+  assert.deepEqual(displayed.slice(2).map(({ charge }) => charge.value), [0, 0, 0, 0]);
+  close(view.summary.costMonth.earlierCorrection, -24);
+  close(view.summary.costMonth.value, 70.4);
+  close(displayed.reduce((sum, point) => sum + point.charge.value, 0) +
+    view.summary.costMonth.earlierCorrection, view.summary.costMonth.value);
+  assert.equal(view.daily.at(-7).charge, undefined);
+});
+
 test("uses the published seasonal profile and spreads February over all leap days", () => {
   const standard = costOptions({
     discounted_ft_per_mj: 2, heating_value_mj_per_m3: 1, correction_factor: 1,
@@ -87,6 +118,7 @@ test("leaves missing or unpriced days blank and marks affected totals and allowa
   const days = new Map([[start, 1], [start + day, 1], [today, 1]]);
   const view = buildCostView(days, today, options({ effective_from: "2026-08-02" }), true);
   assert.deepEqual(view.daily.slice(-4).map(({ value }) => value), [null, 52, null, 52]);
+  assert.deepEqual(view.daily.slice(-4).map(({ charge }) => charge?.value), [undefined, 52, undefined, 52]);
   assert.equal(view.summary.costToday.delayed, true);
   assert.equal(view.summary.costToday.uncertain, true);
   assert.equal(view.summary.costMonth.incomplete, true);

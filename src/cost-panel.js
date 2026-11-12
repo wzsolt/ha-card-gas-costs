@@ -5,10 +5,6 @@ import { Plot } from "./plot.js";
 
 const historyLifetime = 60 * 60_000;
 
-function dailyCharge(point) {
-  return point?.value == null ? null : point.discounted + point.market + point.base;
-}
-
 export class CostPanel {
   constructor() {
     this.visible = chartVisibility();
@@ -113,20 +109,27 @@ export class CostPanel {
       const item = element("div", "cost-total");
       const label = element("dt", "", text[key]);
       const isToday = key === "costToday";
-      const total = isToday ? dailyCharge(point) : point.value;
+      const total = isToday ? point.charge?.value ?? null : point.value;
       const value = element("dd", "", total === null ? "—" : currency(total));
       const details = point ? flags(point) : [];
       if (key === "costBilling") details.unshift(date.format(point.key));
       item.append(label, value);
       if (isToday && total !== null) {
-        item.append(element("dd", "subtitle", text.costCorrection + ": " + currency(point.correction)));
+        item.append(element("dd", "subtitle", text.costEarlierCorrection + ": " + currency(point.earlierCorrection)));
+      }
+      if (key === "costMonth" && Math.round(point.earlierCorrection) !== 0) {
+        const monthlyCharge = currency(point.value - point.earlierCorrection);
+        item.append(
+          element("dd", "subtitle", text.costMonthCharge + ": " + monthlyCharge),
+          element("dd", "subtitle", text.costEarlierCorrection + ": " + currency(point.earlierCorrection)),
+        );
       }
       if (details.length) item.append(element("dd", "subtitle", details.join(" · ")));
       return item;
     }));
     for (const [period, { title, plot, empty }] of this.charts) {
       const points = period === "daily"
-        ? view.daily.map((point) => ({ ...point, value: dailyCharge(point) }))
+        ? view.daily.map((point) => ({ ...point, ...point.charge, value: point.charge?.value ?? null }))
         : view[period];
       const hasPoints = points.some(({ value }) => value !== null);
       title.textContent = text["cost_" + period];
@@ -142,13 +145,18 @@ export class CostPanel {
         period: (point) => period === "yearly" ? dateRange(point) :
           (period === "monthly" ? month : date).format(point.key),
         value: (point) => currency(point.value),
-        details: (point) => [
-          text.costDiscount + " " + currency(point.discounted),
-          text.costMarket + " " + currency(point.market),
-          text.costBase + " " + currency(point.base),
-          Math.round(point.correction) !== 0 && text.costCorrection + " " + currency(point.correction),
-          ...flags(point),
-        ].filter(Boolean),
+        details: (point) => {
+          const daily = period === "daily";
+          const correction = daily ? point.earlierCorrection : point.correction;
+          const correctionLabel = daily ? text.costEarlierCorrection : text.costCorrection;
+          return [
+            text.costDiscount + " " + currency(point.discounted),
+            text.costMarket + " " + currency(point.market),
+            text.costBase + " " + currency(point.base),
+            Math.round(correction) !== 0 && correctionLabel + " " + currency(correction),
+            ...flags(point),
+          ].filter(Boolean);
+        },
       });
     }
   }
