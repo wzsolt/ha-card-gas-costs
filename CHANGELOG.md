@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.4]
+
+- Keep chart positions stable when hovering over a value or showing its cost breakdown.
+- Match the Gas Meter Card chart containers, headings, and responsive layout.
+
 ## [0.1.3]
 
 - Allocate each month’s earned discount across its measured days so daily charges reconcile to the monthly balance.

@@ -23,15 +23,19 @@ export class Plot {
     this.canvas = element("canvas");
     this.canvas.setAttribute("aria-hidden", "true");
     this.readout = element("div", "readout");
-    this.readout.setAttribute("aria-live", "polite");
-    this.readout.setAttribute("aria-atomic", "true");
+    this.readoutLine = element("div", "readout-line");
+    this.readoutLine.setAttribute("aria-live", "polite");
+    this.readoutLine.setAttribute("aria-atomic", "true");
     this.readoutPeriod = element("span", "readout-period");
     this.readoutValue = element("strong", "readout-value");
-    this.readout.append(this.readoutPeriod, this.readoutValue);
+    this.readoutLine.append(this.readoutPeriod, this.readoutValue);
+    this.readout.append(this.readoutLine);
+    this.detailsSlot = element("div", "chart-details-slot");
     this.details = element("p", "chart-details");
+    this.detailsSlot.append(this.details);
     this.node.tabIndex = 0;
     this.node.setAttribute("role", "group");
-    this.node.append(this.readout, this.canvas, this.details);
+    this.node.append(this.readout, this.canvas, this.detailsSlot);
     this.resize = new ResizeObserver(() => this.draw());
 
     const pointAt = (event) => {
@@ -74,11 +78,42 @@ export class Plot {
     const selectedKey = this.points?.[this.index]?.key;
     this.options = options;
     this.points = points;
-    this.text = text;
+    this.idle = { period: text.tooltipHelp, value: "", details: "" };
+    this.descriptions = points.map((point) => {
+      const known = point.value !== null;
+      const details = known ? options.details(point) : [];
+      if (point.partial) details.push(text.partial);
+      return {
+        period: options.period(point),
+        value: known ? options.value(point) : text.missing,
+        details: details.join(" · "),
+      };
+    });
+    this.reserveReadoutSpace();
     this.axisNumber = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });
     this.node.setAttribute("aria-label", options.label + ". " + text.tooltipHelp);
     this.select(points.findIndex(({ key }) => key === selectedKey));
     if (this.index === null) this.pinned = false;
+  }
+
+  reserveReadoutSpace() {
+    // Stack hidden copies under the active readouts so the longest localized
+    // breakdown determines the layout at the card's current width.
+    const lines = [this.idle, ...this.descriptions].map(({ period, value }) => {
+      const line = element("div", "readout-line readout-sizer");
+      line.setAttribute("aria-hidden", "true");
+      line.append(element("span", "", period));
+      if (value) line.append(element("strong", "", value));
+      return line;
+    });
+    const breakdowns = new Set(this.descriptions.map(({ details }) => details).filter(Boolean));
+    const details = [...breakdowns].map((text) => {
+      const line = element("p", "readout-sizer", text);
+      line.setAttribute("aria-hidden", "true");
+      return line;
+    });
+    this.readout.replaceChildren(this.readoutLine, ...lines);
+    this.detailsSlot.replaceChildren(this.details, ...details);
   }
 
   connect() {
@@ -97,18 +132,12 @@ export class Plot {
 
   select(index) {
     this.index = this.points?.[index] ? index : null;
-    const point = this.points?.[this.index];
-    const known = point && point.value !== null;
-    const period = point ? this.options.period(point) : this.text?.tooltipHelp ?? "";
-    const value = point ? (known ? this.options.value(point) : this.text.missing) : "";
-    const details = known ? this.options.details(point) : [];
-    if (point?.partial) details.push(this.text.partial);
-
+    const { period = "", value = "", details = "" } = this.descriptions?.[this.index] ?? this.idle ?? {};
     if (this.readoutPeriod.textContent !== period) this.readoutPeriod.textContent = period;
     if (this.readoutValue.textContent !== value) this.readoutValue.textContent = value;
-    this.readoutValue.hidden = !point;
-    this.details.textContent = details.join(" · ");
-    this.details.hidden = details.length === 0;
+    this.readoutValue.hidden = this.index === null;
+    if (this.details.textContent !== details) this.details.textContent = details;
+    this.details.hidden = details === "";
     this.draw();
   }
 

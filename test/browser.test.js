@@ -139,6 +139,31 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
 
     const plot = daily.locator(".plot");
     const dailyValue = daily.locator(".readout-value");
+    const canvas = daily.locator("canvas");
+    await page.setViewportSize({ width: 300, height: 760 });
+    const layout = () => panel.evaluate((node) => {
+      const top = (selector) => node.querySelector(selector).getBoundingClientRect().top + window.scrollY;
+      return [top("canvas"), top(".note"), node.getBoundingClientRect().height];
+    });
+    const baseline = await layout();
+    const narrowWidth = (await canvas.boundingBox()).width;
+    await canvas.hover({ position: { x: narrowWidth - 16, y: 45 } });
+    assert.equal(await dailyValue.textContent(), "4 Ft");
+    assert.equal(await daily.locator(".chart-details").isVisible(), true);
+    assert.deepEqual(await layout(), baseline);
+    await canvas.hover({ position: { x: 48, y: 45 } });
+    assert.equal(await dailyValue.textContent(), "3 Ft");
+    assert.deepEqual(await layout(), baseline);
+    await panel.getByRole("heading", { name: "Becsült gázköltség" }).hover();
+    assert.equal(await dailyValue.isHidden(), true);
+    assert.deepEqual(await layout(), baseline);
+
+    assert.equal(await daily.evaluate((node) => getComputedStyle(node).borderRadius), "14px");
+    assert.equal(await daily.locator(".chart-heading ha-icon").count(), 1);
+    await page.setViewportSize({ width: 820, height: 760 });
+    assert.equal(await panel.locator(".cost-charts").evaluate((node) =>
+      getComputedStyle(node).gridTemplateColumns.split(" ").length), 2);
+    await page.setViewportSize({ width: 520, height: 760 });
     await plot.focus();
     await page.keyboard.press("End");
     assert.equal(await dailyValue.textContent(), "4 Ft");
@@ -146,7 +171,6 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     await page.keyboard.press("ArrowLeft");
     assert.equal(await dailyValue.textContent(), "1 Ft");
     assert.match(await daily.locator(".chart-details").textContent(), /Kereten túli díj 0 Ft.*Alapdíj 1 Ft/);
-    const canvas = daily.locator("canvas");
     const width = (await canvas.boundingBox()).width;
     await canvas.tap({ position: { x: width - 20, y: 45 } });
     await canvas.hover({ position: { x: 48, y: 45 } });

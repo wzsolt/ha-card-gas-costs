@@ -4,6 +4,9 @@ import { element, icon } from "./dom.js";
 import { Plot } from "./plot.js";
 
 const historyLifetime = 60 * 60_000;
+const chartIcons = {
+  daily: "mdi:chart-bar", monthly: "mdi:calendar-month-outline", yearly: "mdi:calendar-range",
+};
 
 export class CostPanel {
   constructor() {
@@ -19,10 +22,13 @@ export class CostPanel {
     this.summary = element("dl", "cost-summary");
     this.controls = element("div", "cost-controls");
     this.controls.setAttribute("role", "group");
+    const charts = element("div", "cost-charts");
     this.charts = new Map(chartPeriods.map((period) => {
       const button = element("button", "toggle");
       button.type = "button";
       button.dataset.period = period;
+      const buttonLabel = element("span");
+      button.append(icon(chartIcons[period]), buttonLabel);
       button.addEventListener("click", () => {
         this.visible[period] = !this.visible[period];
         this.render(this.context);
@@ -32,16 +38,24 @@ export class CostPanel {
       const section = element("section", "cost-chart");
       section.dataset.period = period;
       section.hidden = true;
-      const title = element("h3", "cost-chart-title");
+      const head = element("div", "chart-heading");
+      const chartGlyph = element("span", "glyph");
+      chartGlyph.append(icon(chartIcons[period]));
+      const copy = element("div");
+      const title = element("h3");
+      const subtitle = element("p", "subtitle");
+      copy.append(title, subtitle);
+      head.append(chartGlyph, copy);
       const plot = new Plot();
       const empty = element("p", "status");
-      section.append(title, plot.node, empty);
-      return [period, { button, section, title, plot, empty }];
+      section.append(head, plot.node, empty);
+      charts.append(section);
+      return [period, { button, buttonLabel, section, title, subtitle, plot, empty }];
     }));
     this.status = element("p", "status");
     this.status.setAttribute("role", "status");
     this.note = element("p", "note");
-    this.node.append(heading, this.summary, this.controls, ...[...this.charts.values()].map(({ section }) => section), this.status, this.note);
+    this.node.append(heading, this.summary, this.controls, charts, this.status, this.note);
   }
 
   setConfig(config) {
@@ -75,9 +89,9 @@ export class CostPanel {
     const hasData = Boolean(view?.yearly.some(({ value }) => value !== null));
     this.controls.hidden = !view;
     this.summary.hidden = !view;
-    for (const [period, { button, section }] of this.charts) {
+    for (const [period, { button, buttonLabel, section }] of this.charts) {
       button.setAttribute("aria-pressed", String(this.visible[period]));
-      button.textContent = text["cost_" + period];
+      buttonLabel.textContent = text["cost_" + period];
       section.hidden = !view || !this.visible[period];
     }
     const warning = view?.summary.costYear?.uncertain ? text.costUncertain :
@@ -127,18 +141,19 @@ export class CostPanel {
       if (details.length) item.append(element("dd", "subtitle", details.join(" · ")));
       return item;
     }));
-    for (const [period, { title, plot, empty }] of this.charts) {
+    for (const [period, { title, subtitle, plot, empty }] of this.charts) {
       const points = period === "daily"
         ? view.daily.map((point) => ({ ...point, ...point.charge, value: point.charge?.value ?? null }))
         : view[period];
       const hasPoints = points.some(({ value }) => value !== null);
       title.textContent = text["cost_" + period];
+      subtitle.textContent = period === "daily" ? text.costDailyCharge : text.costNetBalance;
       plot.node.hidden = !hasPoints;
       empty.hidden = hasPoints;
       empty.textContent = text.empty;
       if (!hasPoints) continue;
       plot.setData(points, locale, text, {
-        label: title.textContent + " · " + (period === "daily" ? text.costDailyCharge : text.costNetBalance),
+        label: title.textContent + " · " + subtitle.textContent,
         tick: (point) => period === "yearly"
           ? new Date(point.key).getUTCFullYear() + "/" + String(new Date(point.end).getUTCFullYear()).slice(-2)
           : (period === "monthly" ? shortMonth : shortDay).format(point.key),
