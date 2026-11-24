@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.6]
+
+- Show monthly consumption in m³ as stacked green discounted and red above-allowance bars, including carried allowance and the opening balance.
+- Show each tier's volume and gas charge, the profile allowance, base fee, earlier-month correction, and net monthly balance when selecting a month.
+- Keep chart positions stable during mouse, touch, and keyboard selection, and use yellow for the gas-year chart.
+
 ## [0.1.5]
 
 - Place the selected date and amount in the chart header with a stable layout.

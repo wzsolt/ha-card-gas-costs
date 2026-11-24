@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
@@ -11,7 +13,7 @@ const tag = "ha-card-gas-costs";
 const fixedTime = Date.parse("2026-11-11T09:45:00Z");
 const hour = 3_600_000;
 
-async function mount(page, config, dark = true) {
+async function mount(page, config, dark = true, language = "hu-HU") {
   await page.clock.install({ time: fixedTime });
   await page.setContent('<style>body { margin: 12px; font: 16px system-ui; }</style><main></main>');
   await page.evaluate(() => {
@@ -44,11 +46,11 @@ async function mount(page, config, dark = true) {
   });
   await page.addScriptTag({ path: bundle, type: "module" });
   await page.evaluate((tag) => customElements.whenDefined(tag).then(() => undefined), tag);
-  await page.evaluate(({ tag, config, dark, hour }) => {
+  await page.evaluate(({ tag, config, dark, hour, language }) => {
     window.calls = [];
     window.hass = {
       config: { time_zone: "Europe/Budapest" },
-      locale: { language: "hu-HU" },
+      locale: { language },
       themes: { darkMode: dark },
       states: { [config.consumption_entity]: { state: "155.90", attributes: { unit_of_measurement: "m³" } } },
       callWS: async (request) => {
@@ -79,7 +81,20 @@ async function mount(page, config, dark = true) {
     card.setConfig(config);
     card.hass = window.hass;
     document.querySelector("main").append(card);
-  }, { tag, config, dark, hour });
+  }, { tag, config, dark, hour, language });
+}
+
+async function paintedColors(canvas) {
+  return canvas.evaluate((node) => {
+    const { data } = node.getContext("2d").getImageData(0, 0, node.width, node.height);
+    const counts = {};
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] !== 255) continue;
+      const color = [data[i], data[i + 1], data[i + 2]].join(",");
+      counts[color] = (counts[color] ?? 0) + 1;
+    }
+    return counts;
+  });
 }
 
 test("MVM cost editor, billing summary and interactive daily, monthly and gas-year views", { timeout: 60_000 }, async () => {
@@ -194,11 +209,22 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     const monthWidth = (await monthCanvas.boundingBox()).width;
     await monthCanvas.click({ position: { x: monthWidth - 20, y: 45 } });
     assert.match(await monthly.locator(".readout-period").textContent(), /november/);
-    assert.equal(await monthly.locator(".readout-value").textContent(), "108 Ft");
+    assert.equal(await monthly.locator(".readout-value").textContent(), "18,5 m³");
+    assert.match(await monthly.locator(".chart-details").textContent(),
+      /Kedvezményes: 11 m³ \/ 22 Ft.*Kereten túli: 7,5 m³ \/ 75 Ft/);
+    assert.match(await monthly.locator(".chart-details").textContent(),
+      /Jelleggörbe szerinti havi keret: 30 m³.*eddig megnyílt keret: 11 m³.*Alapdíj: 11 Ft.*Havi egyenleg: 108 Ft/);
+    assert.deepEqual(await monthly.locator(".chart-legend span").allTextContents(), ["Kedvezményes", "Kereten túli"]);
+    const monthlyColors = await paintedColors(monthCanvas);
+    assert.ok(monthlyColors["119,202,137"] > 30);
+    assert.ok(monthlyColors["245,120,130"] > 30);
     await yearly.locator(".plot").focus();
     await page.keyboard.press("End");
     assert.match(await yearly.locator(".readout-period").textContent(), /2026.*2027/);
     assert.equal(await yearly.locator(".readout-value").textContent(), "382 Ft");
+    assert.ok((await paintedColors(yearly.locator("canvas")))["255,196,76"] > 30);
+    assert.equal(await yearly.locator(".glyph").evaluate((node) => getComputedStyle(node).color),
+      await yearlyToggle.evaluate((node) => getComputedStyle(node).color));
     await dailyToggle.click();
     assert.equal(await daily.isVisible(), false);
     assert.equal(await monthly.isVisible(), true);
@@ -235,7 +261,87 @@ test("MVM cost editor, billing summary and interactive daily, monthly and gas-ye
     assert.doesNotMatch(await panel.textContent(), /Korábbi keret ismeretlen/);
     assert.equal(await page.evaluate(() => window.calls.findLast(({ period }) => period === "day").start_time),
       "2026-10-31T23:00:00.000Z");
+    await monthlyToggle.click();
+    await monthly.locator(".plot").focus();
+    await page.keyboard.press("End");
+    assert.equal(await monthly.locator(".readout-value").textContent(), "18,5 m³");
+    assert.match(await monthly.locator(".chart-details").textContent(),
+      /Kedvezményes: 8 m³ \/ 16 Ft.*Kereten túli: 10,5 m³ \/ 105 Ft.*korrekciója: -24 Ft.*Havi egyenleg: 108 Ft/);
     assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("monthly stacks stay stable during hover and selection in both languages and themes", { timeout: 60_000 }, async () => {
+  const browser = await chromium.launch({ executablePath: process.env.GAS_COSTS_CHROMIUM });
+  try {
+    for (const dark of [true, false]) for (const language of ["hu-HU", "en"]) {
+      const page = await browser.newPage({ viewport: { width: 300, height: 900 }, hasTouch: true });
+      const settings = {
+        ...config, charts: { daily: false, monthly: true, yearly: true },
+        cost: { effective_from: "2026-08-01", discounted_ft_per_mj: 2, market_ft_per_mj: 10,
+          heating_value_mj_per_m3: 1, correction_factor: 1, annual_allowance_mj: 365,
+          base_ft_per_year: 360, monthly_weights: [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] },
+      };
+      await mount(page, settings, dark, language);
+      const card = page.locator(tag);
+      const month = card.locator('.cost-chart[data-period="monthly"]');
+      const year = card.locator('.cost-chart[data-period="yearly"]');
+      const canvas = month.locator("canvas");
+      await canvas.waitFor();
+      const layout = () => card.evaluate((node) => {
+        const root = node.shadowRoot;
+        return [root.querySelector(".cost-panel"), ...root.querySelectorAll("canvas, .note")].map((element) => {
+          const rect = element.getBoundingClientRect();
+          return [rect.top + window.scrollY, rect.height];
+        });
+      });
+      for (const width of [300, 820]) {
+        await page.setViewportSize({ width, height: 900 });
+        await month.locator(".plot").focus();
+        await page.keyboard.press("Escape");
+        const baseline = await layout();
+        const chartWidth = (await canvas.boundingBox()).width;
+        await canvas.hover({ position: { x: chartWidth - 18, y: 45 } });
+        assert.match(await month.locator(".readout-value").textContent(), /18[,.]5 m³/);
+        assert.deepEqual(await layout(), baseline);
+        const colors = await paintedColors(canvas);
+        assert.ok(colors[dark ? "119,202,137" : "35,118,58"] > 30);
+        assert.ok(colors[dark ? "245,120,130" : "188,40,56"] > 30);
+        // The last bar is stacked vertically: red above green, with no overlap.
+        const column = await canvas.evaluate((node) => {
+          const x = Math.floor((46 + (node.clientWidth - 60) * 11.5 / 12) * window.devicePixelRatio);
+          const { data } = node.getContext("2d").getImageData(x, 0, 1, node.height);
+          return Array.from({ length: node.height }, (_, y) => [...data.slice(y * 4, y * 4 + 3)].join(","));
+        });
+        const red = column.indexOf(dark ? "245,120,130" : "188,40,56");
+        const green = column.indexOf(dark ? "119,202,137" : "35,118,58");
+        assert.ok(red >= 0 && green > red);
+        await canvas.hover({ position: { x: 48, y: 45 } });
+        assert.match(await month.locator(".readout-value").textContent(), /Nincs adat|No data/);
+        assert.deepEqual(await layout(), baseline);
+        await month.locator("h3").hover();
+        await month.locator(".plot").blur();
+        assert.deepEqual(await layout(), baseline);
+        await canvas.tap({ position: { x: chartWidth - 18, y: 45 } });
+        await canvas.hover({ position: { x: 48, y: 45 } });
+        assert.match(await month.locator(".readout-value").textContent(), /18[,.]5 m³/);
+        assert.deepEqual(await layout(), baseline);
+        await page.keyboard.press("Home");
+        assert.match(await month.locator(".readout-value").textContent(), /Nincs adat|No data/);
+        await page.keyboard.press("End");
+        assert.match(await month.locator(".readout-value").textContent(), /18[,.]5 m³/);
+        await page.keyboard.press("ArrowLeft");
+        assert.match(await month.locator(".readout-value").textContent(), /31 m³/);
+        assert.deepEqual(await layout(), baseline);
+        await year.locator(".plot").focus();
+        await page.keyboard.press("End");
+        assert.ok((await paintedColors(year.locator("canvas")))[dark ? "255,196,76" : "134,84,0"] > 30);
+        if (width === 300) await month.screenshot({ path: join(tmpdir(), "gas-costs-stacked-" + language + "-" + dark + ".png") });
+      }
+      await page.close();
+    }
   } finally {
     await browser.close();
   }

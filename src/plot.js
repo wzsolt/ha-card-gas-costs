@@ -1,7 +1,7 @@
 import { element } from "./dom.js";
 
 const left = 46;
-const top = 8;
+const top = 20;
 const right = 14;
 const bottom = 27;
 
@@ -35,7 +35,9 @@ export class Plot {
     this.detailsSlot.append(this.details);
     this.node.tabIndex = 0;
     this.node.setAttribute("role", "group");
-    this.node.append(this.canvas, this.detailsSlot);
+    this.palette = element("div");
+    this.palette.hidden = true;
+    this.node.append(this.canvas, this.detailsSlot, this.palette);
     this.resize = new ResizeObserver(() => this.draw());
 
     const pointAt = (event) => {
@@ -77,6 +79,7 @@ export class Plot {
   setData(points, locale, text, options) {
     const selectedKey = this.points?.[this.index]?.key;
     this.options = options;
+    this.palette.replaceChildren(...(options.stacks ?? []).map(({ className }) => element("span", className)));
     this.points = points;
     this.descriptions = points.map((point) => {
       const known = point.value !== null;
@@ -161,6 +164,10 @@ export class Plot {
     const y = (value) => top + (end - value) / (end - start) * chartHeight;
 
     ctx.font = "11px " + style.fontFamily;
+    ctx.fillStyle = colors.text;
+    ctx.textBaseline = "top";
+    ctx.textAlign = "right";
+    ctx.fillText(this.options.unit, left - 7, 0);
     ctx.textBaseline = "middle";
     ctx.textAlign = "right";
     for (let tick = 0; tick <= Math.round((end - start) / step); tick++) {
@@ -183,12 +190,34 @@ export class Plot {
       ctx.globalAlpha = 0.16;
       ctx.fillRect(x(this.index) - slot / 2, top, slot, chartHeight);
     }
-    ctx.fillStyle = colors.line;
-    this.points.forEach(({ value, partial }, index) => {
+    const stackColors = [...this.palette.children].map((node) => getComputedStyle(node).color);
+    this.points.forEach((point, index) => {
+      const { value, partial } = point;
       if (value === null) return;
       ctx.globalAlpha = partial && index !== this.index ? 0.55 : 1;
       const bar = Math.min(32, slot * 0.67);
       const zero = y(0);
+      if (this.options.stacks) {
+        let total = 0;
+        const segments = this.options.stacks.map(({ field }, i) => ({ value: point[field], color: stackColors[i] }))
+          .filter(({ value }) => value > 0);
+        if (value === 0) {
+          ctx.fillStyle = stackColors[0];
+          ctx.fillRect(x(index) - bar / 2, zero - 1, bar, 1);
+        }
+        segments.forEach((segment, i) => {
+          const lower = y(total);
+          total += segment.value;
+          const upper = y(total);
+          ctx.fillStyle = segment.color;
+          ctx.beginPath();
+          ctx.roundRect(x(index) - bar / 2, upper, bar, lower - upper,
+            i === segments.length - 1 ? [3, 3, 0, 0] : 0);
+          ctx.fill();
+        });
+        return;
+      }
+      ctx.fillStyle = colors.line;
       const barHeight = Math.max(1, Math.abs(zero - y(value)));
       const barTop = value < 0 ? zero : zero - barHeight;
       ctx.beginPath();

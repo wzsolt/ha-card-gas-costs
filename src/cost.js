@@ -203,6 +203,29 @@ function summarize(ledger, charges, key, end, today, delayed, first) {
   };
 }
 
+function monthlyConsumption(point, ledger, charges, today, options) {
+  const mjPerM3 = options.heating_value_mj_per_m3 * options.correction_factor;
+  let heat = 0;
+  let discounted = 0;
+  let market = 0;
+  for (let key = point.key; key < Math.min(point.end, today + dayMs); key += dayMs) {
+    const line = ledger.get(key);
+    if (!line) continue;
+    heat += line.heat;
+    discounted += charges.get(key).discounted;
+    market += charges.get(key).market;
+  }
+  const value = point.value === null ? null : heat / mjPerM3;
+  const discountedVolume = discounted / options.discounted_ft_per_mj / mjPerM3;
+  return {
+    value, discounted, market, discountedVolume,
+    marketVolume: value === null ? 0 : Math.max(0, value - discountedVolume),
+    allowanceVolume: options.monthlyAllowance[new Date(point.key).getUTCMonth()] / mjPerM3,
+    accruedAllowanceVolume: accruedAllowance(point.key, Math.min(point.end, today + dayMs),
+      options.monthlyAllowance) / mjPerM3,
+  };
+}
+
 export function buildCostView(days, today, options, delayed = false) {
   const first = costHistoryStart(today, options);
   const ledger = dailyLedger(days, first, today, options);
@@ -212,8 +235,10 @@ export function buildCostView(days, today, options, delayed = false) {
     const key = today - (29 - index) * dayMs;
     return { ...point(key, key + dayMs), charge: charges.get(key) };
   });
-  const monthly = Array.from({ length: 12 }, (_, index) =>
-    point(monthStart(today, index - 11), monthStart(today, index - 10)));
+  const monthly = Array.from({ length: 12 }, (_, index) => {
+    const month = point(monthStart(today, index - 11), monthStart(today, index - 10));
+    return { ...month, consumption: monthlyConsumption(month, ledger, charges, today, options) };
+  });
   const yearly = [-3, -2, -1, 0].map((offset) =>
     point(gasYearStart(today, offset), gasYearStart(today, offset + 1)))
     .filter(({ end }) => end > firstMvmDay);

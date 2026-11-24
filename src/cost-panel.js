@@ -47,10 +47,17 @@ export class CostPanel {
       copy.append(title, subtitle);
       const plot = new Plot();
       head.append(chartGlyph, copy, plot.readout);
+      const legend = element("div", "chart-legend");
+      legend.hidden = period !== "monthly";
+      const legendLabels = ["discounted", "market"].map((tier) => {
+        const label = element("span", "tier-" + tier);
+        legend.append(label);
+        return label;
+      });
       const empty = element("p", "status");
-      section.append(head, plot.node, empty);
+      section.append(head, legend, plot.node, empty);
       charts.append(section);
-      return [period, { button, buttonLabel, section, title, subtitle, plot, empty }];
+      return [period, { button, buttonLabel, section, title, subtitle, legendLabels, plot, empty }];
     }));
     this.status = element("p", "status");
     this.status.setAttribute("role", "status");
@@ -108,6 +115,8 @@ export class CostPanel {
     this.appearance = appearance;
     const amount = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
     const currency = (value) => amount.format(Math.round(value) || 0) + " Ft";
+    const volumeNumber = new Intl.NumberFormat(locale, { maximumFractionDigits: 3 });
+    const volume = (value) => volumeNumber.format(value) + " m³";
     const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" });
     const month = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" });
     const shortMonth = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
@@ -141,13 +150,18 @@ export class CostPanel {
       if (details.length) item.append(element("dd", "subtitle", details.join(" · ")));
       return item;
     }));
-    for (const [period, { title, subtitle, plot, empty }] of this.charts) {
+    for (const [period, { title, subtitle, legendLabels, plot, empty }] of this.charts) {
       const points = period === "daily"
         ? view.daily.map((point) => ({ ...point, ...point.charge, value: point.charge?.value ?? null }))
-        : view[period];
+        : period === "monthly"
+          ? view.monthly.map((point) => ({ ...point, ...point.consumption, balance: point.value }))
+          : view[period];
       const hasPoints = points.some(({ value }) => value !== null);
       title.textContent = text["cost_" + period];
-      subtitle.textContent = period === "daily" ? text.costDailyCharge : text.costNetBalance;
+      subtitle.textContent = period === "daily" ? text.costDailyCharge :
+        period === "monthly" ? text.costMonthlyConsumption : text.costNetBalance;
+      legendLabels[0].textContent = text.costDiscountVolume;
+      legendLabels[1].textContent = text.costMarketVolume;
       plot.node.hidden = !hasPoints;
       plot.readout.hidden = !hasPoints;
       empty.hidden = hasPoints;
@@ -155,13 +169,28 @@ export class CostPanel {
       if (!hasPoints) continue;
       plot.setData(points, locale, text, {
         label: title.textContent + " · " + subtitle.textContent,
+        unit: period === "monthly" ? "m³" : "Ft",
+        stacks: period === "monthly" ? [
+          { field: "discountedVolume", className: "tier-discounted" },
+          { field: "marketVolume", className: "tier-market" },
+        ] : undefined,
         tick: (point) => period === "yearly"
           ? new Date(point.key).getUTCFullYear() + "/" + String(new Date(point.end).getUTCFullYear()).slice(-2)
           : (period === "monthly" ? shortMonth : shortDay).format(point.key),
         period: (point) => period === "yearly" ? dateRange(point) :
           (period === "monthly" ? month : date).format(point.key),
-        value: (point) => currency(point.value),
+        value: (point) => period === "monthly" ? volume(point.value) : currency(point.value),
         details: (point) => {
+          if (period === "monthly") return [
+            text.costDiscountVolume + ": " + volume(point.discountedVolume) + " / " + currency(point.discounted),
+            text.costMarketVolume + ": " + volume(point.marketVolume) + " / " + currency(point.market),
+            text.costMonthlyAllowance + ": " + volume(point.allowanceVolume),
+            point.partial && text.costAccruedAllowance + ": " + volume(point.accruedAllowanceVolume),
+            text.costBase + ": " + currency(point.base),
+            text.costEarlierCorrection + ": " + currency(point.earlierCorrection),
+            text.costMonthlyBalance + ": " + currency(point.balance),
+            ...flags(point),
+          ].filter(Boolean);
           const daily = period === "daily";
           const correction = daily ? point.earlierCorrection : point.correction;
           const correctionLabel = daily ? text.costEarlierCorrection : text.costCorrection;

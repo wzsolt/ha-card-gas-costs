@@ -1,6 +1,10 @@
 const en = {
   cost: "Estimated gas cost", costPeriod: "Cost charts",
   costDailyCharge: "Daily gas charge and base fee", costNetBalance: "Balance after corrections",
+  costMonthlyConsumption: "Consumption by tariff tier · m³",
+  costDiscountVolume: "Discounted", costMarketVolume: "Above allowance",
+  costMonthlyAllowance: "Monthly profile allowance", costAccruedAllowance: "Allowance accrued this month",
+  costMonthlyBalance: "Monthly balance",
   cost_daily: "30 days", cost_monthly: "12 months", cost_yearly: "Gas years",
   costToday: "Today", costMonth: "This month", costYear: "This gas year", costBilling: "Current billing period",
   costDiscount: "Discounted", costMarket: "Above allowance", costBase: "Base fee",
@@ -34,6 +38,10 @@ const en = {
 const hu = {
   cost: "Becsült gázköltség", costPeriod: "Költséggrafikonok",
   costDailyCharge: "Napi gázdíj és alapdíj", costNetBalance: "Egyenleg korrekcióval",
+  costMonthlyConsumption: "Fogyasztás ársávonként · m³",
+  costDiscountVolume: "Kedvezményes", costMarketVolume: "Kereten túli",
+  costMonthlyAllowance: "Jelleggörbe szerinti havi keret", costAccruedAllowance: "E hónapban eddig megnyílt keret",
+  costMonthlyBalance: "Havi egyenleg",
   cost_daily: "30 nap", cost_monthly: "12 hónap", cost_yearly: "Kedvezményes évek",
   costToday: "Ma", costMonth: "Ebben a hónapban", costYear: "Ebben a kedvezményes évben",
   costBilling: "Aktuális diktálási időszak",

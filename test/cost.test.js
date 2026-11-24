@@ -41,6 +41,13 @@ test("allocates the month's earned discount to the measured days and reconciles 
   assert.equal(view.summary.costMonth.earlierCorrection, 0);
   assert.equal(view.summary.costMonth.value, 96);
   assert.equal(view.summary.costToday.charge.value, 0);
+  const monthly = view.monthly.at(-1).consumption;
+  close(monthly.value, 2);
+  close(monthly.discountedVolume, 0.5);
+  close(monthly.marketVolume, 1.5);
+  close(monthly.discounted, 6);
+  close(monthly.market, 90);
+  close(monthly.discounted + monthly.market, view.summary.costMonth.value);
 });
 
 test("keeps correction of opening consumption separate from current month charges", () => {
@@ -60,6 +67,69 @@ test("keeps correction of opening consumption separate from current month charge
   close(displayed.reduce((sum, point) => sum + point.charge.value, 0) +
     view.summary.costMonth.earlierCorrection, view.summary.costMonth.value);
   assert.equal(view.daily.at(-7).charge, undefined);
+  const monthly = view.monthly.at(-1).consumption;
+  close(monthly.value, 2);
+  close(monthly.discountedVolume, (6 * 31 / 30 - 3) / 6);
+  close(monthly.discountedVolume + monthly.marketVolume, monthly.value);
+  close(monthly.discounted + monthly.market + view.summary.costMonth.base +
+    view.summary.costMonth.earlierCorrection, view.summary.costMonth.value);
+});
+
+test("monthly volume tiers include carried allowance and reset on August 1", () => {
+  const august = key("2026-08-01");
+  const september = key("2026-09-01");
+  const days = new Map(Array.from({ length: 31 }, (_, index) => [august + index * day, 0]));
+  days.set(september, 6);
+  const view = buildCostView(days, september, options());
+  const month = view.monthly.at(-1).consumption;
+  close(month.value, 6);
+  close(month.discountedVolume, (31 + 31 / 30) / 6);
+  close(month.marketVolume, 6 - month.discountedVolume);
+  close(month.allowanceVolume, 31 / 6);
+  close(month.accruedAllowanceVolume, 31 / 30 / 6);
+  assert.ok(month.discountedVolume > month.allowanceVolume);
+  close(month.discounted, month.discountedVolume * 6 * 2);
+  close(month.market, month.marketVolume * 6 * 10);
+  const zero = view.monthly.at(-2).consumption;
+  assert.deepEqual([zero.value, zero.discountedVolume, zero.marketVolume, zero.discounted, zero.market],
+    [0, 0, 0, 0, 0]);
+
+  const nextAugust = key("2027-08-01");
+  const reset = buildCostView(new Map([[nextAugust - day, 0], [nextAugust, 1]]), nextAugust, options());
+  close(reset.monthly.at(-1).consumption.discountedVolume, 1 / 6);
+  close(reset.monthly.at(-1).consumption.marketVolume, 5 / 6);
+});
+
+test("monthly tiers keep gaps blank and exclude base fees and earlier corrections from volume", () => {
+  const start = key("2026-08-01");
+  const view = buildCostView(new Map([[start, 1], [start + 2 * day, 1]]), start + 2 * day,
+    options({ base_ft_per_year: 372 }));
+  const month = view.monthly.at(-1);
+  close(month.consumption.value, 2);
+  close(month.consumption.discountedVolume, 2 / 6);
+  close(month.consumption.marketVolume, 10 / 6);
+  close(month.consumption.discounted + month.consumption.market + month.base + month.earlierCorrection,
+    month.value);
+  assert.equal(month.incomplete, true);
+  assert.equal(month.uncertain, true);
+  assert.equal(view.monthly.at(-2).consumption.value, null);
+  assert.equal(view.daily.at(-2).charge, undefined);
+});
+
+test("monthly quota conversion uses the configured factor and all February leap days", () => {
+  const first = key("2028-02-01");
+  const settings = options({
+    effective_from: "2028-02-01", monthly_weights: monthlyWeights, annual_allowance_mj: 63645,
+    heating_value_mj_per_m3: 35.59, correction_factor: 1.0093,
+  });
+  const view = buildCostView(new Map([[first, 1000], [first + day, 0]]), first + day, settings);
+  const monthly = view.monthly.at(-1).consumption;
+  const factor = 35.59 * 1.0093;
+  close(monthly.value, 1000);
+  close(monthly.allowanceVolume, 10421 / factor);
+  close(monthly.accruedAllowanceVolume, 10421 * 2 / 29 / factor);
+  close(monthly.discountedVolume, monthly.accruedAllowanceVolume);
+  close(monthly.discountedVolume + monthly.marketVolume, 1000);
 });
 
 test("uses the published seasonal profile and spreads February over all leap days", () => {

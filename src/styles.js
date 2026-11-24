@@ -8,6 +8,7 @@ export const cardStyles = `
   --gas-blue: light-dark(#006b95, #61c5f0);
   --gas-amber: light-dark(#865400, #ffc44c);
   --gas-green: light-dark(#23763a, #77ca89);
+  --gas-red: light-dark(#bc2838, #f57882);
   --gas-surface: color-mix(in srgb, var(--gas-text) 4%, transparent);
   color: var(--gas-text);
   font-family: var(--primary-font-family, inherit);
@@ -66,8 +67,8 @@ h2 { font-size: 1.2rem; font-weight: 650; line-height: 1.25; }
 .cost-total dd:not(.subtitle) { font-weight: 650; }
 .cost-controls { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 [data-period="daily"] { --accent: var(--gas-blue); }
-[data-period="monthly"] { --accent: var(--gas-amber); }
-[data-period="yearly"] { --accent: var(--gas-green); }
+[data-period="monthly"] { --accent: var(--gas-green); }
+[data-period="yearly"] { --accent: var(--gas-amber); }
 .toggle ha-icon { --mdc-icon-size: 16px; }
 .cost-charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .cost-charts:has(.cost-chart:not([hidden])) { margin: 10px 0 8px; }
@@ -88,6 +89,11 @@ h2 { font-size: 1.2rem; font-weight: 650; line-height: 1.25; }
 .cost-chart .glyph { width: 30px; height: 30px; }
 .cost-chart .glyph ha-icon { --mdc-icon-size: 16px; }
 .plot { color: var(--accent); border: 0 solid var(--gas-grid); border-radius: 6px; }
+.tier-discounted { color: var(--gas-green); }
+.tier-market { color: var(--gas-red); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 4px; font-size: 0.72rem; }
+.chart-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.chart-legend span::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: currentColor; }
 canvas { display: block; width: 100%; height: 148px; touch-action: pan-y; }
 .note, .status, .chart-details-slot { font-size: 0.75rem; color: var(--gas-muted); line-height: 1.4; }
 .readout {
